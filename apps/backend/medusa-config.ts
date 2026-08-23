@@ -11,6 +11,9 @@ module.exports = defineConfig({
       authCors: process.env.AUTH_CORS!,
       jwtSecret: process.env.JWT_SECRET,
       cookieSecret: process.env.COOKIE_SECRET,
-    }
+    },
+  },
+  admin: {
+    backendUrl: process.env.MEDUSA_BACKEND_URL
   }
 })

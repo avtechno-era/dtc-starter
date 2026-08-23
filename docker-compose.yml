@@ -1,0 +1,100 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: medusa-store
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - medusa_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+  # Redis
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379"
+    networks:
+      - medusa_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  # Medusa Server
+  # This service runs the Medusa backend application
+  # and the admin dashboard.
+  medusa:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "9000:9000"
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - DB_NAME=${DB_NAME}
+      - REDIS_URL=redis://redis:6379
+      - STORE_CORS=http://storefront:8000,https://docs.medusajs.com
+      - ADMIN_CORS=http://medusa:5173,http://medusa:9000, http://localhost:9000,https://docs.medusajs.com
+      - AUTH_CORS=http://medusa:5173,http://medusa:9000,http://localhost:9000, https://docs.medusajs.com
+      - JWT_SECRET=${JWT_SECRET}
+      - COOKIE_SECRET=${COOKIE_SECRET}
+    volumes:
+      - /node_modules
+      - /apps/backend/node_modules
+    networks:
+      - medusa_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://medusa:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+  # Storefront
+  # This service runs the Next.js Starter Storefront
+  storefront:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - medusa
+    ports:
+      - "8000:8000"
+    environment:
+      - NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
+      - NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://medusa:9000
+      - NEXT_PUBLIC_BASE_URL=https://storefront:8000
+      - NEXT_PUBLIC_DEFAULT_REGION=ph
+      - NEXT_PUBLIC_BASE_URL=http://storefront:8000
+      - NEXT_PUBLIC_STRIPE_KEY=
+      - MEDUSA_CLOUD_S3_HOSTNAME=
+      - MEDUSA_CLOUD_S3_PATHNAME=
+    volumes:
+      - /node_modules
+      - /apps/backend/node_modules
+      - /apps/storefront/node_modules
+      - /apps/storefront/.next
+    entrypoint: ["./start-storefront.sh"]
+    networks:
+      - medusa_network
+
+volumes:
+  postgres_data:
+
+networks:
+  medusa_network:
+    driver: bridge
