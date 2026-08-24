@@ -1,6 +1,8 @@
 #!/bin/sh
 cd apps/backend
 
+pnpm build
+
 echo "Running database migrations..."
 pnpm medusa db:migrate
 
