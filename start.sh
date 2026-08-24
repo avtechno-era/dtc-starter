@@ -10,6 +10,8 @@ pnpm backend:seed || echo "Seeding failed, continuing..."
 
 cd apps/backend
 
+pnpm install
+
 echo "Migrating bullshit"
 pnpm medusa db:migrate
 

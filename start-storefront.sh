@@ -1,6 +1,8 @@
 #!/bin/sh
 cd apps/storefront
 
+pnpm install
+
 echo "Building Medusa Storefront"
 pnpm build
 
