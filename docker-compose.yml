@@ -1,103 +1,121 @@
+version: "3.8"
+
 services:
   # PostgreSQL Database
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
+    container_name: dtc_postgres
     environment:
-      POSTGRES_DB: medusa-store
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${DB_NAME:-medusa-store}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
     ports:
-      - "5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - medusa_network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 5
       start_period: 10s
-  # Redis
+
+  # Redis Cache
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    container_name: dtc_redis
     ports:
-      - "6379"
+      - "${REDIS_PORT:-6379}:6379"
     networks:
       - medusa_network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
-      retries: 10
-  # Medusa Server
-  # This service runs the Medusa backend application
-  # and the admin dashboard.
+      retries: 5
+      start_period: 10s
+    command: redis-server --appendonly yes
+
+  # Medusa Backend
   medusa:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile.medusa
     restart: unless-stopped
+    container_name: dtc_medusa
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     ports:
-      - "9000:9000"
-      - "5173:5173"
+      - "${MEDUSA_PORT:-9000}:9000"
+      - "${ADMIN_PORT:-5173}:5173"
     environment:
-      - NODE_ENV=development
-      - DATABASE_URL=${DATABASE_URL}
-      - DB_NAME=${DB_NAME}
-      - REDIS_URL=redis://redis:6379
-      - STORE_CORS=http://storefront:8000,https://docs.medusajs.com
-      - ADMIN_CORS=http://medusa:5173,http://medusa:9000, http://localhost:9000,https://docs.medusajs.com
-      - AUTH_CORS=http://medusa:5173,http://medusa:9000,http://localhost:9000, https://docs.medusajs.com
-      - JWT_SECRET=${JWT_SECRET}
-      - COOKIE_SECRET=${COOKIE_SECRET}
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-medusa-store}
+      REDIS_URL: redis://redis:6379
+      STORE_CORS: ${STORE_CORS:-http://localhost:8000}
+      ADMIN_CORS: ${ADMIN_CORS:-http://localhost:9000,http://localhost:5173}
+      AUTH_CORS: ${AUTH_CORS:-http://localhost:9000,http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-jwt-key-change-this}
+      COOKIE_SECRET: ${COOKIE_SECRET:-your-secret-cookie-key-change-this}
+      DEBUG: ${DEBUG:-false}
     volumes:
       - /node_modules
-      - /apps/backend/node_modules
+      - /app/node_modules
+      - /app/apps/backend/node_modules
     networks:
       - medusa_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://medusa:9000/health"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9000/health"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 30s
-  # Storefront
-  # This service runs the Next.js Starter Storefront
+      start_period: 60s
+
+  # Next.js Storefront (Optional)
   storefront:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./Dockerfile.storefront
     restart: unless-stopped
+    container_name: dtc_storefront
     depends_on:
-      - medusa
+      medusa:
+        condition: service_healthy
     ports:
-      - "8000:8000"
+      - "${STOREFRONT_PORT:-8000}:3000"
     environment:
-      - NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
-      - NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://medusa:9000
-      - NEXT_PUBLIC_BASE_URL=https://storefront:8000
-      - NEXT_PUBLIC_DEFAULT_REGION=ph
-      - NEXT_PUBLIC_BASE_URL=http://storefront:8000
-      - NEXT_PUBLIC_STRIPE_KEY=
-      - MEDUSA_CLOUD_S3_HOSTNAME=
-      - MEDUSA_CLOUD_S3_PATHNAME=
+      NODE_ENV: ${NODE_ENV:-production}
+      NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY: ${NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY}
+      NEXT_PUBLIC_MEDUSA_BACKEND_URL: ${NEXT_PUBLIC_MEDUSA_BACKEND_URL:-http://medusa:9000}
+      NEXT_PUBLIC_BASE_URL: ${NEXT_PUBLIC_BASE_URL:-http://localhost:8000}
+      NEXT_PUBLIC_DEFAULT_REGION: ${NEXT_PUBLIC_DEFAULT_REGION:-us}
+      NEXT_PUBLIC_STRIPE_KEY: ${NEXT_PUBLIC_STRIPE_KEY:-}
+      MEDUSA_CLOUD_S3_HOSTNAME: ${MEDUSA_CLOUD_S3_HOSTNAME:-}
+      MEDUSA_CLOUD_S3_PATHNAME: ${MEDUSA_CLOUD_S3_PATHNAME:-}
     volumes:
       - /node_modules
-      - /apps/backend/node_modules
-      - /apps/storefront/node_modules
-      - /apps/storefront/.next
-    entrypoint: ["./start-storefront.sh"]
+      - /app/node_modules
+      - /app/apps/storefront/node_modules
+      - /app/apps/storefront/.next
     networks:
       - medusa_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
 volumes:
   postgres_data:
+    driver: local
 
 networks:
   medusa_network:
