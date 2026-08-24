@@ -16,7 +16,7 @@ RUN pnpm install --frozen-lockfile
 
 # Copy source
 COPY apps/backend ./apps/backend
-COPY packages ./packages
+COPY node_modules ./node_modules
 COPY start.sh ./
 
 RUN chmod +x start.sh
