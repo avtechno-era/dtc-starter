@@ -36,7 +36,8 @@ services:
   # This service runs the Medusa backend application
   # and the admin dashboard.
   medusa:
-    build: .
+    build:
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       - postgres
@@ -68,7 +69,8 @@ services:
   # Storefront
   # This service runs the Next.js Starter Storefront
   storefront:
-    build: .
+    build:
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       - medusa
