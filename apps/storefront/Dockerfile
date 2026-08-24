@@ -16,7 +16,6 @@ RUN pnpm install --frozen-lockfile
 
 # Copy source
 COPY apps/storefront ./apps/storefront
-COPY node_modules ./node_modules
 COPY start-storefront.sh ./
 
 RUN chmod +x start-storefront.sh
