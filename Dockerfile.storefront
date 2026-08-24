@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN npm install -g pnpm@10.11.1
+
+# Copy workspace manifests
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
+
+# Copy app manifests
+COPY apps/backend/package.json ./apps/backend/
+COPY apps/storefront/package.json ./apps/storefront/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build storefront
+RUN cd apps/storefront && pnpm build
+
+EXPOSE 3000
+
+CMD ["sh", "-c", "cd apps/storefront && pnpm start"]
