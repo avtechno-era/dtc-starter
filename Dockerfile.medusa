@@ -1,0 +1,25 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN npm install -g pnpm@10.11.1
+
+# Copy workspace manifests
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json .npmrc ./
+
+# Copy app manifests
+COPY apps/backend/package.json ./apps/backend/
+COPY apps/storefront/package.json ./apps/storefront/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build backend
+RUN cd apps/backend && pnpm build
+
+EXPOSE 9000 5173
+
+CMD ["sh", "-c", "pnpm medusa db:migrate && pnpm backend:seed || true && pnpm start"]
