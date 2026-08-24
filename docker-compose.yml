@@ -37,6 +37,7 @@ services:
   # and the admin dashboard.
   medusa:
     build:
+      context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
@@ -70,6 +71,7 @@ services:
   # This service runs the Next.js Starter Storefront
   storefront:
     build:
+      context: .
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:

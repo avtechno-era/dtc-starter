@@ -1,5 +1,8 @@
 #!/bin/sh
 cd apps/storefront
 
-echo "Starting Next.js Starter Storefront development server..."
+echo "Building Medusa Storefront"
+pnpm build
+
+echo "Starting Medusa Storefront server..."
 pnpm start
